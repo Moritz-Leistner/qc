@@ -38,6 +38,12 @@ and include this flag in the command line `--ogbench_dataset_dir=[realpath/to/yo
 
 We include the example command for all the methods we evaluate in our paper below. For `scene` and `puzzle-3x3` domains, use `--sparse=True`. We also release our plot data at [plot_data/README.md](plot_data/README.md).
 
+For Mac you have to set
+
+```bash
+MUJOCO_GL=glfw
+```
+
 ```bash
 # QC
 MUJOCO_GL=egl python main.py --run_group=reproduce --agent.actor_type=best-of-n --agent.actor_num_samples=32 --env_name=cube-triple-play-singletask-task2-v0 --sparse=False --horizon_length=5
