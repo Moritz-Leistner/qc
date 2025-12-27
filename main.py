@@ -4,6 +4,7 @@ from ml_collections import config_flags
 from log_utils import setup_wandb, get_exp_name, get_flag_dict, CsvLogger
 
 from envs.env_utils import make_env_and_datasets
+from envs.agx_utils import make_agx_env_and_dataset
 from envs.ogbench_utils import make_ogbench_env_and_datasets
 
 from utils.flax_utils import save_agent
@@ -21,7 +22,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('run_group', 'Debug', 'Run group.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
-flags.DEFINE_string('env_name', 'cube-triple-play-singletask-task2-v0', 'Environment (dataset) name.')
+flags.DEFINE_string('env_name', 'AgxCave-Rock-Capturing-Vision-v0', 'Environment (dataset) name.')
 flags.DEFINE_string('save_dir', 'exp/', 'Save directory.')
 
 flags.DEFINE_integer('offline_steps', 1000000, 'Number of online steps.')
@@ -45,6 +46,7 @@ config_flags.DEFINE_config_file('agent', 'agents/acfql.py', lock_config=False)
 flags.DEFINE_float('dataset_proportion', 1.0, "Proportion of the dataset to use")
 flags.DEFINE_integer('dataset_replace_interval', 1000, 'Dataset replace interval, used for large datasets because of memory constraints')
 flags.DEFINE_string('ogbench_dataset_dir', None, 'OGBench dataset directory')
+flags.DEFINE_string("agx_dataset_dir", None, "Directory with agx demonstration")
 
 flags.DEFINE_integer('horizon_length', 5, 'action chunking length.')
 flags.DEFINE_bool('sparse', False, "make the task sparse reward")
@@ -89,6 +91,11 @@ def main(_):
             FLAGS.env_name,
             dataset_path=dataset_paths[dataset_idx],
             compact_dataset=False,
+        )
+    elif FLAGS.agx_dataset_dir is not None:
+        env, eval_env, train_dataset, val_dataset = make_agx_env_and_dataset(
+            FLAGS.env_name,
+            FLAGS.agx_dataset_dir,
         )
     else:
         env, eval_env, train_dataset, val_dataset = make_env_and_datasets(FLAGS.env_name)
