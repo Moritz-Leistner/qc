@@ -2,6 +2,7 @@ import os
 import pickle
 import numpy as np
 import gymnasium
+from agxcave.agxenvs.utils.parse_cfg import parse_env_cfg
 
 BASE = "agxcave.agxtasks.excavator"
 ROCK_CONFIG = f"{BASE}.rock_capturing.config"
@@ -22,13 +23,13 @@ def demos_to_dataset(demos):
     obs, actions, rewards, terminals, next_obs = [], [], [], [], []
 
     for traj in demos:
-        T = len(traj["actions"])
+        T = len(traj)
         for t in range(T):
-            obs.append(traj["observations"][t])
-            actions.append(traj["actions"][t])
-            rewards.append(traj["rewards"][t])
+            obs.append(traj[t]["state"])
+            actions.append(traj[t]["action"])
+            rewards.append(0.0)
             terminals.append(float(t == T - 1))
-            next_obs.append(traj["observations"][t + 1] if t + 1 < T else traj["observations"][t])
+            next_obs.append(traj[t + 1]["state"] if t + 1 < T else traj[t]["state"])
 
     dataset = dict(
         observations=np.asarray(obs, dtype=np.float32),
@@ -49,12 +50,20 @@ def make_agx_env_and_dataset(env_name, demo_dir):
         disable_env_checker=True,
         kwargs={
             "env_cfg_entry_point": f"{ROCK_CONFIG}.rock_capturing_vision_cfg:RockCapturingVisionEnvCfg",
+            "teleoperation_cfg_entry_point": f"{BASE}.teleoperation_cfg",
         },
     )
-    env = gymnasium.make(env_name)
-    eval_env = gymnasium.make(env_name)
+    cfg = parse_env_cfg(
+        env_name,
+        device="cpu",
+        headless=True,
+        render_mode=None,
+    )
+
+    env = gymnasium.make(env_name, cfg=cfg)
+    #eval_env = gymnasium.make(env_name, cfg=cfg)
 
     demos = load_demo_pickles(demo_dir)
     train_dataset = demos_to_dataset(demos)
 
-    return env, eval_env, train_dataset, None
+    return env, None, train_dataset, None
