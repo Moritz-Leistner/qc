@@ -61,7 +61,7 @@ def make_agx_env_and_dataset(env_name, demo_dir):
     )
 
     env = gymnasium.make(env_name, cfg=cfg)
-    #eval_env = gymnasium.make(env_name, cfg=cfg)
+    eval_env = None
 
     demos = load_demo_pickles(demo_dir)
     train_dataset = demos_to_dataset(demos)

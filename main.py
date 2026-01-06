@@ -30,7 +30,7 @@ flags.DEFINE_integer('online_steps', 1000000, 'Number of online steps.')
 flags.DEFINE_integer('buffer_size', 2000000, 'Replay buffer size.')
 flags.DEFINE_integer('log_interval', 5000, 'Logging interval.')
 flags.DEFINE_integer('eval_interval', 100000, 'Evaluation interval.')
-flags.DEFINE_integer('save_interval', -1, 'Save interval.')
+flags.DEFINE_integer('save_interval', 10000, 'Save interval.')
 flags.DEFINE_integer('start_training', 5000, 'when does training start')
 
 flags.DEFINE_integer('utd_ratio', 1, "update to data ratio")
@@ -191,15 +191,16 @@ def main(_):
         if i == FLAGS.offline_steps - 1 or \
             (FLAGS.eval_interval != 0 and i % FLAGS.eval_interval == 0):
             # during eval, the action chunk is executed fully
-            eval_info, _, _ = evaluate(
-                agent=agent,
-                env=eval_env,
-                action_dim=example_batch["actions"].shape[-1],
-                num_eval_episodes=FLAGS.eval_episodes,
-                num_video_episodes=FLAGS.video_episodes,
-                video_frame_skip=FLAGS.video_frame_skip,
-            )
-            logger.log(eval_info, "eval", step=log_step)
+            if eval_env is not None:
+                eval_info, _, _ = evaluate(
+                    agent=agent,
+                    env=eval_env,
+                    action_dim=example_batch["actions"].shape[-1],
+                    num_eval_episodes=FLAGS.eval_episodes,
+                    num_video_episodes=FLAGS.video_episodes,
+                    video_frame_skip=FLAGS.video_frame_skip,
+                )
+                logger.log(eval_info, "eval", step=log_step)
 
     # transition from offline to online
     replay_buffer = ReplayBuffer.create_from_initial_dataset(
@@ -292,15 +293,16 @@ def main(_):
 
         if i == FLAGS.online_steps - 1 or \
             (FLAGS.eval_interval != 0 and i % FLAGS.eval_interval == 0):
-            eval_info, _, _ = evaluate(
-                agent=agent,
-                env=eval_env,
-                action_dim=action_dim,
-                num_eval_episodes=FLAGS.eval_episodes,
-                num_video_episodes=FLAGS.video_episodes,
-                video_frame_skip=FLAGS.video_frame_skip,
-            )
-            logger.log(eval_info, "eval", step=log_step)
+            if eval_env is not None:
+                eval_info, _, _ = evaluate(
+                    agent=agent,
+                    env=eval_env,
+                    action_dim=action_dim,
+                    num_eval_episodes=FLAGS.eval_episodes,
+                    num_video_episodes=FLAGS.video_episodes,
+                    video_frame_skip=FLAGS.video_frame_skip,
+                )
+                logger.log(eval_info, "eval", step=log_step)
 
         # saving
         if FLAGS.save_interval > 0 and i % FLAGS.save_interval == 0:
