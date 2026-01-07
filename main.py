@@ -4,7 +4,7 @@ from ml_collections import config_flags
 from log_utils import setup_wandb, get_exp_name, get_flag_dict, CsvLogger
 
 from envs.env_utils import make_env_and_datasets
-from envs.agx_utils import make_agx_env_and_dataset
+from envs.agx_utils import make_agx_env_and_dataset, convert_obs
 from envs.ogbench_utils import make_ogbench_env_and_datasets
 
 from utils.flax_utils import save_agent
@@ -223,8 +223,9 @@ def main(_):
         online_rng, key = jax.random.split(online_rng)
         
         # during online rl, the action chunk is executed fully
+        ob_agent = convert_obs(ob)
         if len(action_queue) == 0:
-            action = agent.sample_actions(observations=ob, rng=key)
+            action = agent.sample_actions(observations=ob_agent, rng=key)
 
             action_chunk = np.array(action).reshape(-1, action_dim)
             for action in action_chunk:
@@ -232,12 +233,13 @@ def main(_):
         action = action_queue.pop(0)
         
         next_ob, int_reward, terminated, truncated, info = env.step(action)
+        next_ob_agent = convert_obs(next_ob)
         done = terminated or truncated
 
         if FLAGS.save_all_online_states:
             state = env.get_state()
             data["steps"].append(i)
-            data["obs"].append(np.copy(next_ob))
+            data["obs"].append(np.copy(next_ob_agent))
             data["qpos"].append(np.copy(state["qpos"]))
             data["qvel"].append(np.copy(state["qvel"]))
             if "button_states" in state:
@@ -262,12 +264,12 @@ def main(_):
             int_reward = (int_reward != 0.0) * -1.0
 
         transition = dict(
-            observations=ob,
+            observations=ob_agent,
             actions=action,
             rewards=int_reward,
             terminals=float(done),
             masks=1.0 - terminated,
-            next_observations=next_ob,
+            next_observations=next_ob_agent,
         )
         replay_buffer.add_transition(transition)
         

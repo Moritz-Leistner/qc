@@ -25,11 +25,20 @@ def demos_to_dataset(demos):
     for traj in demos:
         T = len(traj)
         for t in range(T):
-            obs.append(traj[t]["state"])
+            obs.append(np.concatenate(
+                [traj[t]["state"][:3], traj[t]["stone_pos"]],
+                axis=-1
+            ))
             actions.append(traj[t]["action"])
             rewards.append(0.0)
             terminals.append(float(t == T - 1))
-            next_obs.append(traj[t + 1]["state"] if t + 1 < T else traj[t]["state"])
+            next_obs.append(np.concatenate(
+                [
+                    traj[t + 1]["state"][:3] if t + 1 < T else traj[t]["state"][:3],
+                    traj[t + 1]["stone_pos"] if t + 1 < T else traj[t]["stone_pos"],
+                ],
+                axis=-1
+            ))
 
     dataset = dict(
         observations=np.asarray(obs, dtype=np.float32),
@@ -60,10 +69,23 @@ def make_agx_env_and_dataset(env_name, demo_dir):
         render_mode=None,
     )
 
-    env = gymnasium.make(env_name, cfg=cfg)
+    env = gymnasium.make(env_name, cfg=cfg, agx_args=[])
     eval_env = None
 
     demos = load_demo_pickles(demo_dir)
     train_dataset = demos_to_dataset(demos)
 
     return env, None, train_dataset, None
+
+def convert_obs(obs):
+    return np.concatenate([
+        flatten_field(obs["policy"].flatten()[:3]), 
+        flatten_field(obs["stone"])
+    ])
+
+def flatten_field(x):
+    if x is None:
+        return np.array([], dtype=np.float32)
+    if hasattr(x, "detach"):
+        x = x.detach().cpu().numpy()
+    return np.asarray(x, dtype=np.float32).ravel() 
