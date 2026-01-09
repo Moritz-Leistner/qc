@@ -75,7 +75,7 @@ def make_agx_env_and_dataset(env_name, demo_dir):
     demos = load_demo_pickles(demo_dir)
     train_dataset = demos_to_dataset(demos)
 
-    return env, None, train_dataset, None
+    return env, env, train_dataset, None
 
 def convert_obs(obs):
     return np.concatenate([

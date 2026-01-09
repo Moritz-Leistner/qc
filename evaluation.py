@@ -4,6 +4,7 @@ import jax
 import numpy as np
 from tqdm import trange
 from functools import partial
+from envs.agx_utils import convert_obs
 
 
 def supply_rng(f, rng=jax.random.PRNGKey(0)):
@@ -84,8 +85,8 @@ def evaluate(
         gripper_contact_lengths = []
         gripper_contact_length = 0
         while not done:
-            
-            action = actor_fn(observations=observation)
+            obs = convert_obs(observation)
+            action = actor_fn(observations=obs)
 
             if len(action_queue) == 0:
                 have_new_action = True
@@ -101,6 +102,7 @@ def evaluate(
                 action = np.random.normal(action, eval_gaussian)
 
             next_observation, reward, terminated, truncated, info = env.step(np.clip(action, -1, 1))
+            next_obs = convert_obs(next_observation)
             done = terminated or truncated
             step += 1
 
@@ -109,8 +111,8 @@ def evaluate(
                 render.append(frame)
 
             transition = dict(
-                observation=observation,
-                next_observation=next_observation,
+                observation=obs,
+                next_observation=next_obs,
                 action=action,
                 reward=reward,
                 done=done,
@@ -155,7 +157,10 @@ def evaluate(
             renders.append(np.array(render))
 
     for k, v in stats.items():
-        stats[k] = np.mean(v)
-
+        arr = np.array(v)
+        if np.issubdtype(arr.dtype, np.number):
+            stats[k] = np.mean(arr)
+        else:
+            stats[k] = v
     return stats, trajs, renders
 
