@@ -4,8 +4,9 @@ from ml_collections import config_flags
 from log_utils import setup_wandb, get_exp_name, get_flag_dict, CsvLogger
 
 from envs.env_utils import make_env_and_datasets
+from envs.agx_utils import make_agx_env_and_dataset, convert_obs
 from envs.ogbench_utils import make_ogbench_env_and_datasets
-from envs.robomimic_utils import is_robomimic_env
+# from envs.robomimic_utils import is_robomimic_env
 
 from utils.flax_utils import save_agent
 from utils.datasets import Dataset, ReplayBuffer
@@ -26,18 +27,18 @@ flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_string('env_name', 'cube-triple-play-singletask-task2-v0', 'Environment (dataset) name.')
 flags.DEFINE_string('save_dir', 'exp/', 'Save directory.')
 
-flags.DEFINE_integer('online_steps', 1000000, 'Number of online steps.')
-flags.DEFINE_integer('buffer_size', 1000000, 'Replay buffer size.')
+flags.DEFINE_integer('online_steps', 2000000, 'Number of online steps.')
+flags.DEFINE_integer('buffer_size', 2000000, 'Replay buffer size.')
 flags.DEFINE_integer('log_interval', 5000, 'Logging interval.')
-flags.DEFINE_integer('eval_interval', 100000, 'Evaluation interval.')
-flags.DEFINE_integer('save_interval', -1, 'Save interval.')
+flags.DEFINE_integer('eval_interval', 50000, 'Evaluation interval.')
+flags.DEFINE_integer('save_interval', 50000, 'Save interval.')
 flags.DEFINE_integer('start_training', 5000, 'when does training start')
 
 flags.DEFINE_integer('utd_ratio', 1, "update to data ratio")
 
 flags.DEFINE_float('discount', 0.99, 'discount factor')
 
-flags.DEFINE_integer('eval_episodes', 50, 'Number of evaluation episodes.')
+flags.DEFINE_integer('eval_episodes', 25, 'Number of evaluation episodes.')
 flags.DEFINE_integer('video_episodes', 0, 'Number of video episodes for each task.')
 flags.DEFINE_integer('video_frame_skip', 3, 'Frame skip for videos.')
 
@@ -46,6 +47,7 @@ config_flags.DEFINE_config_file('agent', 'agents/acrlpd.py', lock_config=False)
 flags.DEFINE_float('dataset_proportion', 1.0, "Proportion of the dataset to use")
 flags.DEFINE_integer('dataset_replace_interval', 1000, 'Dataset replace interval, used for large datasets because of memory constraints')
 flags.DEFINE_string('ogbench_dataset_dir', None, 'OGBench dataset directory')
+flags.DEFINE_string("agx_dataset_dir", None, "Directory with agx demonstration")
 
 flags.DEFINE_integer('horizon_length', 5, 'action chunking length.')
 flags.DEFINE_bool('sparse', False, "make the task sparse reward")
@@ -66,7 +68,7 @@ class LoggingHelper:
 
 def main(_):
     exp_name = get_exp_name(FLAGS.seed)
-    run = setup_wandb(project='qc', group=FLAGS.run_group, name=exp_name)
+    run = setup_wandb(project='rlpd', group=FLAGS.run_group, name=exp_name)
     
     FLAGS.save_dir = os.path.join(FLAGS.save_dir, wandb.run.project, FLAGS.run_group, FLAGS.env_name, exp_name)
     os.makedirs(FLAGS.save_dir, exist_ok=True)
@@ -91,6 +93,13 @@ def main(_):
             dataset_path=dataset_paths[dataset_idx],
             compact_dataset=False,
         )
+    elif FLAGS.agx_dataset_dir is not None:
+        env, eval_env, train_dataset, val_dataset = make_agx_env_and_dataset(
+            FLAGS.env_name,
+            FLAGS.agx_dataset_dir,
+        )
+        # config.actor_hidden_dims = (256, 256)
+        # config.value_hidden_dims = (256, 256)
     else:
         env, eval_env, train_dataset, val_dataset = make_env_and_datasets(FLAGS.env_name)
 
@@ -120,11 +129,11 @@ def main(_):
                 **{k: v[:new_size] for k, v in ds.items()}
             )
         
-        if is_robomimic_env(FLAGS.env_name):
-            penalty_rewards = ds["rewards"] - 1.0
-            ds_dict = {k: v for k, v in ds.items()}
-            ds_dict["rewards"] = penalty_rewards
-            ds = Dataset.create(**ds_dict)
+        # if is_robomimic_env(FLAGS.env_name):
+        #     penalty_rewards = ds["rewards"] - 1.0
+        #     ds_dict = {k: v for k, v in ds.items()}
+        #     ds_dict["rewards"] = penalty_rewards
+        #     ds = Dataset.create(**ds_dict)
         
         if FLAGS.sparse:
             # Create a new dataset with modified rewards instead of trying to modify the frozen one
@@ -138,7 +147,7 @@ def main(_):
     train_dataset = process_train_dataset(train_dataset)
     example_batch = train_dataset.sample(())
     
-    agent_class = agents[config['agent_name']]
+    agent_class = agents[config["agent_name"]]
     agent = agent_class.create(
         FLAGS.seed,
         example_batch['observations'],
@@ -161,6 +170,7 @@ def main(_):
     replay_buffer = ReplayBuffer.create(example_batch, size=FLAGS.buffer_size)
         
     ob, _ = env.reset()
+    ob_agent = convert_obs(ob)
     
     action_queue = []
     action_dim = example_batch["actions"].shape[-1]
@@ -180,14 +190,15 @@ def main(_):
             if i <= FLAGS.start_training:
                 action = jax.random.uniform(key, shape=(action_dim,), minval=-1, maxval=1)
             else:
-                action = agent.sample_actions(observations=ob, rng=key)
+                action = agent.sample_actions(observations=ob_agent, rng=key)
 
             action_chunk = np.array(action).reshape(-1, action_dim)
             for action in action_chunk:
                 action_queue.append(action)
         action = action_queue.pop(0)
         
-        next_ob, int_reward, terminated, truncated, info = env.step(action)
+        next_ob, int_reward, terminated, truncated, info = env.step([action[0], action[1], action[2], 0, 0])
+        next_ob_agent = convert_obs(next_ob)
         done = terminated or truncated
         
         if FLAGS.save_all_online_states:
@@ -212,21 +223,21 @@ def main(_):
         ):
             # Adjust reward for D4RL antmaze.
             int_reward = int_reward - 1.0
-        elif is_robomimic_env(FLAGS.env_name):
-            # Adjust online (0, 1) reward for robomimic
-            int_reward = int_reward - 1.0
+        # elif is_robomimic_env(FLAGS.env_name):
+        #     # Adjust online (0, 1) reward for robomimic
+        #     int_reward = int_reward - 1.0
 
         if FLAGS.sparse:
             assert int_reward <= 0.0
             int_reward = (int_reward != 0.0) * -1.0
 
         transition = dict(
-            observations=ob,
+            observations=ob_agent,
             actions=action,
             rewards=int_reward,
             terminals=float(done),
             masks=1.0 - terminated,
-            next_observations=next_ob,
+            next_observations=next_ob_agent,
         )
         replay_buffer.add_transition(transition)
         

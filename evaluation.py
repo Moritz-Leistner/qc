@@ -65,22 +65,37 @@ def evaluate(
     trajs = []
     stats = defaultdict(list)
 
+    # Custom Logging
+    returns = []
+    successes = []
+    over_boundarys = []
+    falled_down = []
+    end_positions = []
+
     renders = []
     for i in trange(num_eval_episodes + num_video_episodes):
         traj = defaultdict(list)
         should_render = i >= num_eval_episodes
 
         observation, info = env.reset()
-            
+        
         observation_history = []
         action_history = []
-        
+
         done = False
         step = 0
         render = []
         action_chunk_lens = defaultdict(lambda: 0)
-
+        
         action_queue = []
+
+        # Custon Logging
+        ep_return = 0.0
+        success = False
+        over_boundary = False
+        fall_down = False
+        end_position = 0.0
+
 
         gripper_contact_lengths = []
         gripper_contact_length = 0
@@ -101,7 +116,26 @@ def evaluate(
             if eval_gaussian is not None:
                 action = np.random.normal(action, eval_gaussian)
 
-            next_observation, reward, terminated, truncated, info = env.step(np.clip(action, -1, 1))
+            next_observation, reward, terminated, truncated, info = env.step(np.clip([action[0],action[1],action[2],0,0], -1, 1))
+
+            # Custon Logging
+            stone_pos = next_observation["stone"]
+            z = stone_pos[0][2]
+            end_position = z
+
+            if z >= 1.5:
+                over_boundary = True
+
+            if over_boundary and z <= 1.0:
+                fall_down = True
+
+            rock_stable = info.get('extras', None)["Step_Reward/rock_stable"]
+            if rock_stable == 12000.0:
+                success = True
+
+            ep_return += reward
+            # End Custom Logging
+
             next_obs = convert_obs(next_observation)
             done = terminated or truncated
             step += 1
@@ -138,6 +172,14 @@ def evaluate(
                         gripper_contact_lengths.append(gripper_contact_length)
                     gripper_contact_length = 0
 
+
+        returns.append(ep_return)        
+        successes.append(success)
+        over_boundarys.append(over_boundary)
+        falled_down.append(fall_down)
+        end_positions.append(end_position)
+
+
         if gripper_contact_length > 0:
             gripper_contact_lengths.append(gripper_contact_length)
         
@@ -156,11 +198,27 @@ def evaluate(
         else:
             renders.append(np.array(render))
 
+
+
     for k, v in stats.items():
         arr = np.array(v)
         if np.issubdtype(arr.dtype, np.number):
             stats[k] = np.mean(arr)
         else:
             stats[k] = v
+    
+    # Custon Logging
+    mean_return = np.mean(returns)
+    success_ratio = np.mean(successes)
+    over_boundary_ratio = np.mean(over_boundarys)
+    fall_down_ratio = np.mean(falled_down)
+    ends = np.mean(end_positions)
+
+    stats["mean_return"] = mean_return
+    stats["success_ratio"] = success_ratio
+    stats["over_boundary_ratio"] = over_boundary_ratio
+    stats["fall_down_ratio"] = fall_down_ratio
+    stats["mean_end_position"] = ends
+
     return stats, trajs, renders
 
