@@ -3,6 +3,9 @@ from gymnasium import ObservationWrapper
 from gymnasium.spaces import Box
 from collections import deque
 import numpy as np
+import torch
+import torch.nn as nn
+from torchvision import models, transforms
 
 def space_stack(space: gym.Space, repeat: int):
     """
@@ -83,9 +86,66 @@ class ConvertObservations(ObservationWrapper):
         flatten_field(obs["stone"])
     ])
 
+class VisionObservationWrapper(ObservationWrapper):
+    def __init__(self, env, device="cpu"):
+        super().__init__(env)
+        self.device = device
+
+        self.cnn = make_resnet_feature_extractor(device)
+
+        # policy: 3 values
+        # stone: 3 values
+        # image features: 512
+        low_dim_size = 3 + env.observation_space["stone"].shape[0]
+        image_feat_size = 512
+
+        self.observation_space = Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(low_dim_size + image_feat_size,),
+            dtype=np.float32
+        )
+
+    def observation(self, obs):
+        low_dim = np.concatenate([
+            obs["policy"].flatten()[:3],
+            obs["stone"].flatten(),
+        ])
+
+        img = obs["image"]
+        if img.shape[0] != 3:
+            img = np.transpose(img, (2, 0, 1))
+
+        img = resnet_preprocess(img)
+        img = img.unsqueeze(0).to(self.device)
+
+        with torch.no_grad():
+            img_feat = self.cnn(img).cpu().numpy().squeeze(0)
+
+        return np.concatenate([low_dim, img_feat]).astype(np.float32)
+
 def flatten_field(x):
     if x is None:
         return np.array([], dtype=np.float32)
     if hasattr(x, "detach"):
         x = x.detach().cpu().numpy()
     return np.asarray(x, dtype=np.float32).ravel()
+
+def make_resnet_feature_extractor(device="cpu"):
+    resnet = models.resnet18(pretrained=True)
+    resnet.fc = nn.Identity()
+    resnet.eval()
+    for p in resnet.parameters():
+        p.requires_grad = False
+    resnet.to(device)
+    return resnet
+
+resnet_preprocess = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225],
+    ),
+])
