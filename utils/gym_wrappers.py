@@ -1,6 +1,9 @@
-import gymnasium as gym
+import gymnasium as gym, ObservationWrapper
+from gymnasium.spaces import Box
 from collections import deque
 import numpy as np
+
+from envs.agx_utils import flatten_field
 
 
 def space_stack(space: gym.Space, repeat: int):
@@ -68,3 +71,16 @@ class TemporalEnsembleWrapper(gym.Wrapper):
     def reset(self, **kwargs):
         self.act_history = deque(maxlen=self.pred_horizon)
         return self.env.reset(**kwargs)
+
+
+
+class ConvertObservations(ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.observation_space = Box(shape=(2,), low=-np.inf, high=np.inf) 
+
+    def observation(self, obs):
+        return np.concatenate([
+        flatten_field(obs["policy"].flatten()[:3]), 
+        flatten_field(obs["stone"])
+    ])

@@ -2,6 +2,8 @@ import os
 import pickle
 import numpy as np
 import gymnasium
+
+from utils.gym_wrappers import ConvertObservations
 from agxcave.agxenvs.utils.parse_cfg import parse_env_cfg
 import agxcave.agxtasks  # registers tasks
 
@@ -97,6 +99,7 @@ def make_agx_env_and_dataset(env_name, demo_dir):
     )
 
     env = gymnasium.make(env_name, cfg=cfg, agx_args=[])
+    env = ConvertObservations(env)
     eval_env = None
 
     demos = load_demo_pickles(demo_dir)

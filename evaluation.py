@@ -100,8 +100,8 @@ def evaluate(
         gripper_contact_lengths = []
         gripper_contact_length = 0
         while not done:
-            obs = convert_obs(observation)
-            action = actor_fn(observations=obs)
+            # obs = convert_obs(observation)
+            action = actor_fn(observations=observation)
 
             if len(action_queue) == 0:
                 have_new_action = True
