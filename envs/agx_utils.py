@@ -44,7 +44,6 @@ def demos_to_dataset(demos):
 
     for traj in demos:
         T = len(traj)
-        print(T)
         for t in range(T):
             obs.append(np.concatenate(
                 [traj[t]["state"][:3], traj[t]["stone_pos"]],

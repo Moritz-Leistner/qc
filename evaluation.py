@@ -119,8 +119,8 @@ def evaluate(
             next_observation, reward, terminated, truncated, info = env.step(np.clip([action[0],action[1],action[2],0,0], -1, 1))
 
             # Custon Logging
-            stone_pos = next_observation["stone"]
-            z = stone_pos[0][2]
+            stone_pos = next_observation[-3:]
+            z = stone_pos[2]
             end_position = z
 
             if z >= 1.5:
@@ -136,7 +136,6 @@ def evaluate(
             ep_return += reward
             # End Custom Logging
 
-            next_obs = convert_obs(next_observation)
             done = terminated or truncated
             step += 1
 
@@ -145,8 +144,8 @@ def evaluate(
                 render.append(frame)
 
             transition = dict(
-                observation=obs,
-                next_observation=next_obs,
+                observation=observation,
+                next_observation=next_observation,
                 action=action,
                 reward=reward,
                 done=done,

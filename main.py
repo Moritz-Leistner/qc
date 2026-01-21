@@ -67,7 +67,7 @@ class LoggingHelper:
 
 def main(_):
     exp_name = get_exp_name(FLAGS.seed)
-    run = setup_wandb(project='qc', group=FLAGS.run_group, name=exp_name)
+    run = setup_wandb(project='qc-fql', group=FLAGS.run_group, name=exp_name)
     
     FLAGS.save_dir = os.path.join(FLAGS.save_dir, wandb.run.project, FLAGS.run_group, FLAGS.env_name, exp_name)
     os.makedirs(FLAGS.save_dir, exist_ok=True)
@@ -231,7 +231,7 @@ def main(_):
                 action_queue.append(action)
         action = action_queue.pop(0)
         
-        next_ob, int_reward, terminated, truncated, info = env.step(action)
+        next_ob, int_reward, terminated, truncated, info = env.step([action[0], action[1], action[2], 0, 0])
         done = terminated or truncated
 
         if FLAGS.save_all_online_states:

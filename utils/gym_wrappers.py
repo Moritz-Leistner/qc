@@ -1,10 +1,8 @@
-import gymnasium as gym, ObservationWrapper
+import gymnasium as gym
+from gymnasium import ObservationWrapper
 from gymnasium.spaces import Box
 from collections import deque
 import numpy as np
-
-from envs.agx_utils import flatten_field
-
 
 def space_stack(space: gym.Space, repeat: int):
     """
@@ -84,3 +82,10 @@ class ConvertObservations(ObservationWrapper):
         flatten_field(obs["policy"].flatten()[:3]), 
         flatten_field(obs["stone"])
     ])
+
+def flatten_field(x):
+    if x is None:
+        return np.array([], dtype=np.float32)
+    if hasattr(x, "detach"):
+        x = x.detach().cpu().numpy()
+    return np.asarray(x, dtype=np.float32).ravel()
