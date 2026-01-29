@@ -3,7 +3,7 @@ import pickle
 import numpy as np
 import gymnasium
 
-from utils.gym_wrappers import ConvertObservations
+from qc_utils.gym_wrappers import ConvertObservations
 from agxcave.agxenvs.utils.parse_cfg import parse_env_cfg
 import agxcave.agxtasks  # registers tasks
 

@@ -8,7 +8,7 @@ import ml_collections
 import optax
 from flax import linen as nn
 
-from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
+from qc_utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 from rlpd_networks import Ensemble, StateActionValue, MLP
 from rlpd_distributions import TanhNormal
 

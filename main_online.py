@@ -8,8 +8,8 @@ from envs.agx_utils import make_agx_env_and_dataset, convert_obs
 from envs.ogbench_utils import make_ogbench_env_and_datasets
 # from envs.robomimic_utils import is_robomimic_env
 
-from utils.flax_utils import save_agent
-from utils.datasets import Dataset, ReplayBuffer
+from qc_utils.flax_utils import save_agent
+from qc_utils.datasets import Dataset, ReplayBuffer
 
 from evaluation import evaluate
 from agents import agents

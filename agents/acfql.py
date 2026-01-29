@@ -7,9 +7,9 @@ import jax.numpy as jnp
 import ml_collections
 import optax
 
-from utils.encoders import encoder_modules
-from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
-from utils.networks import ActorVectorField, Value
+from qc_utils.encoders import encoder_modules
+from qc_utils.flax_utils import ModuleDict, TrainState, nonpytree_field
+from qc_utils.networks import ActorVectorField, Value
 
 class ACFQLAgent(flax.struct.PyTreeNode):
     """Flow Q-learning (FQL) agent with action chunking. 
