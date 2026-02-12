@@ -49,7 +49,7 @@ def demos_to_dataset(demos):
                 [traj[t]["state"][:3], traj[t]["stone_pos"]],
                 axis=-1
             ))
-            actions.append(traj[t]["action"][:3])
+            actions.append(-50*traj[t]["action"][:3])
             
             rew = calc_reward(traj[t])
             if t == T - 1:
