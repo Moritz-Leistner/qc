@@ -44,29 +44,31 @@ def demos_to_dataset(demos):
 
     for traj in demos:
         T = len(traj)
-        for t in range(T):
-            obs.append(np.concatenate(
+        for t in range(T - 1):
+            ob = np.concatenate(
                 [traj[t]["state"][:3], traj[t]["stone_pos"]],
                 axis=-1
-            ))
-            actions.append(-50*traj[t]["action"][:3])
-            
-            rew = calc_reward(traj[t])
-            if t == T - 1:
+            )
+            next_ob = np.concatenate(
+                [traj[t + 1]["state"][:3], traj[t + 1]["stone_pos"]],
+                axis=-1
+            )
+
+            action = -50 * traj[t]["action"][:3]
+            reward = calc_reward(traj[t])
+
+            done = (t == T - 2)
+
+            if done:
                 z_stone = traj[t]["stone_pos"][2]
                 if z_stone >= 1.5:
-                    rew = 200.0
-
-            rewards.append(rew)
-
-            terminals.append(float(t == T - 1))
-            next_obs.append(np.concatenate(
-                [
-                    traj[t + 1]["state"][:3] if t + 1 < T else traj[t]["state"][:3],
-                    traj[t + 1]["stone_pos"] if t + 1 < T else traj[t]["stone_pos"],
-                ],
-                axis=-1
-            ))
+                    reward = 200.0
+            
+            obs.append(ob)
+            actions.append(action)
+            rewards.append(reward)
+            terminals.append(float(done))
+            next_obs.append(next_ob)
 
     dataset = dict(
         observations=np.asarray(obs, dtype=np.float32),
@@ -74,8 +76,9 @@ def demos_to_dataset(demos):
         rewards=np.asarray(rewards, dtype=np.float32),
         terminals=np.asarray(terminals, dtype=np.float32),
         next_observations=np.asarray(next_obs, dtype=np.float32),
-        masks=1.0 - np.asarray(terminals, dtype=np.float32),
     )
+
+    dataset["masks"] = 1.0 - dataset["terminals"]
 
     return dataset
 
