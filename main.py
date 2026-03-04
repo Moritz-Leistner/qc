@@ -136,6 +136,8 @@ def main(_):
         return ds
     
     train_dataset = process_train_dataset(train_dataset)
+    print(train_dataset["actions"].min(), train_dataset["actions"].max())
+    train_dataset["actions"] /= 2.0
     example_batch = train_dataset.sample(())
     
     agent_class = agents[config['agent_name']]
@@ -231,7 +233,7 @@ def main(_):
                 action_queue.append(action)
         action = action_queue.pop(0)
         
-        next_ob, int_reward, terminated, truncated, info = env.step([action[0], action[1], action[2], 0, 0])
+        next_ob, int_reward, terminated, truncated, info = env.step(2*[action[0], action[1], action[2], 0, 0])
         done = terminated or truncated
 
         if FLAGS.save_all_online_states:
