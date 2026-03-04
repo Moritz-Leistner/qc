@@ -116,7 +116,7 @@ def evaluate(
             if eval_gaussian is not None:
                 action = np.random.normal(action, eval_gaussian)
 
-            next_observation, reward, terminated, truncated, info = env.step(np.clip([action[0],action[1],action[2],0,0], -1, 1))
+            next_observation, reward, terminated, truncated, info = env.step(np.clip(-50*[action[0],action[1],action[2],0,0], -1, 1))
 
             # Custon Logging
             stone_pos = next_observation[-3:]

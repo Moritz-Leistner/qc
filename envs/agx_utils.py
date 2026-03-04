@@ -54,7 +54,7 @@ def demos_to_dataset(demos):
                 axis=-1
             )
 
-            action = -50 * traj[t]["action"][:3]
+            action = traj[t]["action"][:3]
             reward = calc_reward(traj[t])
 
             done = (t == T - 2)
