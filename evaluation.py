@@ -100,7 +100,6 @@ def evaluate(
         gripper_contact_lengths = []
         gripper_contact_length = 0
         while not done:
-            # obs = convert_obs(observation)
             action = actor_fn(observations=observation)
 
             if len(action_queue) == 0:
@@ -116,9 +115,9 @@ def evaluate(
             if eval_gaussian is not None:
                 action = np.random.normal(action, eval_gaussian)
 
-            next_observation, reward, terminated, truncated, info = env.step(np.clip(-50*[action[0],action[1],action[2],0,0], -1, 1))
+            next_observation, reward, terminated, truncated, info = env.step([action[0]*2,action[1]*2,action[2]*2,0,0])
 
-            # Custon Logging
+            # Custom Logging
             stone_pos = next_observation[-3:]
             z = stone_pos[2]
             end_position = z
@@ -130,7 +129,7 @@ def evaluate(
                 fall_down = True
 
             rock_stable = info.get('extras', None)["Step_Reward/rock_stable"]
-            if rock_stable == 12000.0:
+            if rock_stable > 0:
                 success = True
 
             ep_return += reward
@@ -206,7 +205,7 @@ def evaluate(
         else:
             stats[k] = v
     
-    # Custon Logging
+    # Custom Logging
     mean_return = np.mean(returns)
     success_ratio = np.mean(successes)
     over_boundary_ratio = np.mean(over_boundarys)
