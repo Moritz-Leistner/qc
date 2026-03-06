@@ -49,6 +49,8 @@ flags.DEFINE_string('ogbench_dataset_dir', None, 'OGBench dataset directory')
 flags.DEFINE_string("agx_dataset_dir", None, "Directory with agx demonstration")
 flags.DEFINE_integer("agx_reward", 5, "Reward type")
 
+flags.DEFINE_string('wandb_log_name', 'qc', 'Name under which the run is logged in w&b')
+
 flags.DEFINE_integer('horizon_length', 5, 'action chunking length.')
 flags.DEFINE_bool('sparse', False, "make the task sparse reward")
 
@@ -68,7 +70,7 @@ class LoggingHelper:
 
 def main(_):
     exp_name = get_exp_name(FLAGS.seed)
-    run = setup_wandb(project='qc-fql', group=FLAGS.run_group, name=exp_name)
+    run = setup_wandb(project=FLAGS.wandb_log_name, group=FLAGS.run_group, name=exp_name)
     
     FLAGS.save_dir = os.path.join(FLAGS.save_dir, wandb.run.project, FLAGS.run_group, FLAGS.env_name, exp_name)
     os.makedirs(FLAGS.save_dir, exist_ok=True)
