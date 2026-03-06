@@ -47,6 +47,7 @@ flags.DEFINE_float('dataset_proportion', 1.0, "Proportion of the dataset to use"
 flags.DEFINE_integer('dataset_replace_interval', 1000, 'Dataset replace interval, used for large datasets because of memory constraints')
 flags.DEFINE_string('ogbench_dataset_dir', None, 'OGBench dataset directory')
 flags.DEFINE_string("agx_dataset_dir", None, "Directory with agx demonstration")
+flags.DEFINE_integer("agx_reward", 5, "Reward type")
 
 flags.DEFINE_integer('horizon_length', 5, 'action chunking length.')
 flags.DEFINE_bool('sparse', False, "make the task sparse reward")
@@ -96,6 +97,7 @@ def main(_):
         env, eval_env, train_dataset, val_dataset = make_agx_env_and_dataset(
             FLAGS.env_name,
             FLAGS.agx_dataset_dir,
+            FLAGS.agx_reward
         )
     else:
         env, eval_env, train_dataset, val_dataset = make_env_and_datasets(FLAGS.env_name)
@@ -232,7 +234,7 @@ def main(_):
                 action_queue.append(action)
         action = action_queue.pop(0)
         
-        next_ob, int_reward, terminated, truncated, info = env.step(-50*[action[0], action[1], action[2], 0, 0])
+        next_ob, int_reward, terminated, truncated, info = env.step([action[0]*2, action[1]*2, action[2]*2, 0, 0])
         done = terminated or truncated
 
         if FLAGS.save_all_online_states:

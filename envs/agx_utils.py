@@ -6,25 +6,11 @@ import gymnasium
 from qc_utils.gym_wrappers import ConvertObservations
 from agxcave.agxenvs.utils.parse_cfg import parse_env_cfg
 import agxcave.agxtasks  # registers tasks
+from rewards import calc_reward
+import agxcave.agxtasks.excavator.rock_capturing.config.rock_capturing_cfg as agxrewards
 
 BASE = "agxcave.agxtasks.excavator"
 ROCK_CONFIG = f"{BASE}.rock_capturing.config"
-
-
-def calc_reward(obs):
-    stone_pos = obs["stone_pos"]
-    z = stone_pos[2]
-    target_z = 1.7
-
-    # distance to target height
-    dist = z - target_z
-    reward = -abs(dist)
-
-    # If proper height reached
-    if z >= 1.5:
-        reward += 10
-
-    return reward
 
 
 def load_demo_pickles(demo_dir):
@@ -39,30 +25,28 @@ def load_demo_pickles(demo_dir):
     return demos
 
 
-def demos_to_dataset(demos):
+def demos_to_dataset(demos, reward_type):
     obs, actions, rewards, terminals, next_obs = [], [], [], [], []
 
     for traj in demos:
         T = len(traj)
-        for t in range(T - 1):
+        for t in range(T):
             ob = np.concatenate(
                 [traj[t]["state"][:3], traj[t]["stone_pos"]],
                 axis=-1
             )
             next_ob = np.concatenate(
-                [traj[t + 1]["state"][:3], traj[t + 1]["stone_pos"]],
+                [
+                    traj[t + 1]["state"][:3] if t + 1 < T else traj[t]["state"][:3],
+                    traj[t + 1]["stone_pos"] if t + 1 < T else traj[t]["stone_pos"],
+                ],
                 axis=-1
             )
 
             action = -25*traj[t]["action"][:3]
-            reward = calc_reward(traj[t])
+            reward = calc_reward(traj[t], t == T-1,reward=reward_type)
 
-            done = (t == T - 2)
-
-            if done:
-                z_stone = traj[t]["stone_pos"][2]
-                if z_stone >= 1.5:
-                    reward = 200.0
+            done = (t == T - 1)
             
             obs.append(ob)
             actions.append(action)
@@ -83,7 +67,7 @@ def demos_to_dataset(demos):
     return dataset
 
 
-def make_agx_env_and_dataset(env_name, demo_dir):
+def make_agx_env_and_dataset(env_name, demo_dir, reward):
     # gymnasium.register(
     #     id="AgxCave-Rock-Capturing-Vision-v0",
     #     entry_point="agxcave.agxenvs:ManagerBasedEnv",
@@ -100,12 +84,25 @@ def make_agx_env_and_dataset(env_name, demo_dir):
         render_mode=None,
     )
 
+    reward_map = {
+        1: agxrewards.RockRewards1Cfg,
+        2: agxrewards.RockRewards2Cfg,
+        3: agxrewards.RockRewards3Cfg,
+        4: agxrewards.RockRewards4Cfg,
+        5: agxrewards.RockRewards5Cfg,
+    }
+
+    if reward not in reward_map:
+        raise ValueError(f"Unknown reward config: {reward}")
+
+    cfg.rewards = reward_map[reward]()
+
     env = gymnasium.make(env_name, cfg=cfg, agx_args=[])
     env = ConvertObservations(env)
     eval_env = None
 
     demos = load_demo_pickles(demo_dir)
-    train_dataset = demos_to_dataset(demos)
+    train_dataset = demos_to_dataset(demos, reward_type=reward)
 
     return env, env, train_dataset, None
 
