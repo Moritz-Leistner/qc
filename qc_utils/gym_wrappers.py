@@ -112,7 +112,7 @@ class VisionObservationWrapper(ObservationWrapper):
             obs["stone"].flatten(),
         ])
 
-        img = obs["image"]
+        img = obs["rgb_cabine"]
         if img.shape[0] != 3:
             img = np.transpose(img, (2, 0, 1))
 

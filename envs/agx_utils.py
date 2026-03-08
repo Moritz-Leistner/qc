@@ -2,6 +2,8 @@ import os
 import pickle
 import numpy as np
 import gymnasium
+from rich.console import Console
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
 
 from qc_utils.gym_wrappers import ConvertObservations, VisionObservationWrapper
 from agxcave.agxenvs.utils.parse_cfg import parse_env_cfg
@@ -25,34 +27,40 @@ def load_demo_pickles(demo_dir):
     return demos
 
 
-def demos_to_dataset(demos, reward_type):
+def demos_to_dataset(demos, reward_type, wrapper):
     obs, actions, rewards, terminals, next_obs = [], [], [], [], []
 
-    for traj in demos:
-        T = len(traj)
-        for t in range(T):
-            ob = np.concatenate(
-                [traj[t]["state"][:3], traj[t]["stone_pos"]],
-                axis=-1
-            )
-            next_ob = np.concatenate(
-                [
-                    traj[t + 1]["state"][:3] if t + 1 < T else traj[t]["state"][:3],
-                    traj[t + 1]["stone_pos"] if t + 1 < T else traj[t]["stone_pos"],
-                ],
-                axis=-1
-            )
+    total_steps = sum(len(t) for t in demos)
 
-            action = -25*traj[t]["action"][:3]
-            reward = calc_reward(traj[t], t == T-1,reward=reward_type)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold cyan]Converting demos"),
+        BarColumn(bar_width=35),
+        MofNCompleteColumn(),
+        TextColumn("[dim]traj {task.description}"),
+        console=Console(record=True),
+    ) as progress:
+        task = progress.add_task("", total=len(demos))
 
-            done = (t == T - 1)
+        for i, traj in enumerate(demos):
+            progress.update(task, description=f"{i+1}/{len(demos)}")
+            T = len(traj)
+            for t in range(T):
+                ob = wrapper.observation(traj[t])
+                next_ob = wrapper.observation(traj[t+1]) if t + 1 < T else wrapper.observation(traj[t])
+
+                action = -25*traj[t]["action"][:3]
+                reward = calc_reward(traj[t], t == T-1,reward=reward_type)
+
+                done = (t == T - 1)
+                
+                obs.append(ob)
+                actions.append(action)
+                rewards.append(reward)
+                terminals.append(float(done))
+                next_obs.append(next_ob)
             
-            obs.append(ob)
-            actions.append(action)
-            rewards.append(reward)
-            terminals.append(float(done))
-            next_obs.append(next_ob)
+            progress.advance(task)
 
     dataset = dict(
         observations=np.asarray(obs, dtype=np.float32),
@@ -94,7 +102,7 @@ def make_agx_env_and_dataset(env_name, demo_dir, reward, enable_vision=False):
     eval_env = None
 
     demos = load_demo_pickles(demo_dir)
-    train_dataset = demos_to_dataset(demos, reward_type=reward)
+    train_dataset = demos_to_dataset(demos, reward_type=reward, wrapper=env if enable_vision else None)
 
     return env, env, train_dataset, None
 
