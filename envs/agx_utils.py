@@ -27,7 +27,7 @@ def load_demo_pickles(demo_dir):
     return demos
 
 
-def demos_to_dataset(demos, reward_type, wrapper):
+def demos_to_dataset(demos, reward_type, wrapper, enable_vision):
     obs, actions, rewards, terminals, next_obs = [], [], [], [], []
 
     total_steps = sum(len(t) for t in demos)
@@ -46,8 +46,10 @@ def demos_to_dataset(demos, reward_type, wrapper):
             progress.update(task, description=f"{i+1}/{len(demos)}")
             T = len(traj)
             for t in range(T):
-                ob = wrapper.observation(traj[t])
-                next_ob = wrapper.observation(traj[t+1]) if t + 1 < T else wrapper.observation(traj[t])
+                ob = wrapper.observation(demo_frame_to_obs(traj[t], enable_vision))
+
+                next_frame = traj[t + 1] if t + 1 < T else traj[t]
+                next_ob = wrapper.observation(demo_frame_to_obs(next_frame, enable_vision))
 
                 action = -25*traj[t]["action"][:3]
                 reward = calc_reward(traj[t], t == T-1,reward=reward_type)
@@ -74,6 +76,15 @@ def demos_to_dataset(demos, reward_type, wrapper):
 
     return dataset
 
+def demo_frame_to_obs(frame, enable_vision=False):
+    return {
+        "rgb_cabine": frame["rgb_cabine"],
+        "policy": frame["state"],
+        "stone": frame["stone_pos"],
+    } if enable_vision else {
+        "policy": frame["state"],
+        "stone": frame["stone_pos"],
+    }
 
 def make_agx_env_and_dataset(env_name, demo_dir, reward, enable_vision=False):
     cfg = parse_env_cfg(
@@ -102,7 +113,7 @@ def make_agx_env_and_dataset(env_name, demo_dir, reward, enable_vision=False):
     eval_env = None
 
     demos = load_demo_pickles(demo_dir)
-    train_dataset = demos_to_dataset(demos, reward_type=reward, wrapper=env if enable_vision else None)
+    train_dataset = demos_to_dataset(demos, reward_type=reward, wrapper=env, enable_vision=enable_vision)
 
     return env, env, train_dataset, None
 
