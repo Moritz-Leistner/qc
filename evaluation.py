@@ -65,12 +65,31 @@ def evaluate(
     trajs = []
     stats = defaultdict(list)
 
-    # Custom Logging
+    # fixed termination keys (same as original eval)
+    termination_keys = {
+        "max_steps": 0,
+        "too_deep_termination": 0,
+        "stone_x_distance_termination": 0,
+        "stone_height_termination": 0,
+        "cabin_pitch_termination": 0,
+    }
+
+    # fixed reward keys (same as original eval)
+    reward_keys = {
+        "rock_stable": [],
+        "rock_z_pos": [],
+        "rock_1_5": [],
+        "rock_bucket_dis": [],
+        "rock_z_pos_clipped": [],
+        "energy_reg": [],
+    }
+
     returns = []
     successes = []
-    over_boundarys = []
-    falled_down = []
+    rock_lifted = []
+    fall_downs = []
     end_positions = []
+    episode_lengths = []
 
     renders = []
     for i in trange(num_eval_episodes + num_video_episodes):
@@ -91,9 +110,9 @@ def evaluate(
 
         # Custon Logging
         ep_return = 0.0
-        success = False
-        over_boundary = False
-        fall_down = False
+        episode_success = False
+        episode_rock_lifted = False
+        episode_fall_down = False
         end_position = 0.0
 
 
@@ -123,14 +142,30 @@ def evaluate(
             end_position = z
 
             if z >= 1.5:
-                over_boundary = True
+                episode_rock_lifted = True
 
-            if over_boundary and z <= 1.0:
-                fall_down = True
+            if episode_rock_lifted and z <= 1.0:
+                episode_fall_down = True
 
             rock_stable = info.get('extras', None)["Step_Reward/rock_stable"]
             if rock_stable > 0:
-                success = True
+                episode_success = True
+
+            # reward logging
+            log_info = info.get("extras", {}).get("log", {})
+            step_rewards = info.get("extras", {})
+
+            for key in reward_keys.keys():
+                step_key = f"Step_Reward/{key}"
+                if step_key in step_rewards:
+                    reward_keys[key].append(step_rewards[step_key])
+
+            # termination logging
+            if done:
+                for key in termination_keys.keys():
+                    term_key = f"Episode_Termination/{key}"
+                    if log_info.get(term_key, 0) == 1:
+                        termination_keys[key] += 1
 
             ep_return += reward
             # End Custom Logging
@@ -172,10 +207,11 @@ def evaluate(
 
 
         returns.append(ep_return)        
-        successes.append(success)
-        over_boundarys.append(over_boundary)
-        falled_down.append(fall_down)
+        successes.append(episode_success)
+        rock_lifted.append(episode_rock_lifted)
+        fall_downs.append(episode_fall_down)
         end_positions.append(end_position)
+        episode_lengths.append(step)
 
 
         if gripper_contact_length > 0:
@@ -208,13 +244,15 @@ def evaluate(
     # Custom Logging
     mean_return = np.mean(returns)
     success_ratio = np.mean(successes)
-    over_boundary_ratio = np.mean(over_boundarys)
-    fall_down_ratio = np.mean(falled_down)
+    over_boundary_ratio = np.mean(rock_lifted)
+    fall_down_ratio = np.mean(fall_downs)
     ends = np.mean(end_positions)
+    episode_length = np.mean(episode_lengths)
 
-    stats["mean_return"] = mean_return
+    stats["episode_reward"] = mean_return
+    stats["episode_length"] = episode_length
     stats["success_ratio"] = success_ratio
-    stats["over_boundary_ratio"] = over_boundary_ratio
+    stats["rock_lifted_ratio"] = over_boundary_ratio
     stats["fall_down_ratio"] = fall_down_ratio
     stats["mean_end_position"] = ends
 
