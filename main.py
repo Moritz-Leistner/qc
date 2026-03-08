@@ -53,6 +53,7 @@ flags.DEFINE_string('wandb_log_name', 'qc', 'Name under which the run is logged 
 
 flags.DEFINE_integer('horizon_length', 5, 'action chunking length.')
 flags.DEFINE_bool('sparse', False, "make the task sparse reward")
+flags.DEFINE_bool('enable_vision', False, 'Wheter to the algorithm with the VisionObservationWrapper')
 
 flags.DEFINE_bool('save_all_online_states', False, "save all trajectories to npy")
 
@@ -99,7 +100,8 @@ def main(_):
         env, eval_env, train_dataset, val_dataset = make_agx_env_and_dataset(
             FLAGS.env_name,
             FLAGS.agx_dataset_dir,
-            FLAGS.agx_reward
+            FLAGS.agx_reward,
+            FLAGS.enable_vision
         )
     else:
         env, eval_env, train_dataset, val_dataset = make_env_and_datasets(FLAGS.env_name)

@@ -3,7 +3,7 @@ import pickle
 import numpy as np
 import gymnasium
 
-from qc_utils.gym_wrappers import ConvertObservations
+from qc_utils.gym_wrappers import ConvertObservations, VisionObservationWrapper
 from agxcave.agxenvs.utils.parse_cfg import parse_env_cfg
 import agxcave.agxtasks  # registers tasks
 from rewards import calc_reward
@@ -67,16 +67,7 @@ def demos_to_dataset(demos, reward_type):
     return dataset
 
 
-def make_agx_env_and_dataset(env_name, demo_dir, reward):
-    # gymnasium.register(
-    #     id="AgxCave-Rock-Capturing-Vision-v0",
-    #     entry_point="agxcave.agxenvs:ManagerBasedEnv",
-    #     disable_env_checker=True,
-    #     kwargs={
-    #         "env_cfg_entry_point": f"{ROCK_CONFIG}.rock_capturing_vision_cfg:RockCapturingVisionEnvCfg",
-    #         "teleoperation_cfg_entry_point": f"{BASE}.teleoperation_cfg",
-    #     },
-    # )
+def make_agx_env_and_dataset(env_name, demo_dir, reward, enable_vision=False):
     cfg = parse_env_cfg(
         env_name,
         device="cpu",
@@ -98,7 +89,8 @@ def make_agx_env_and_dataset(env_name, demo_dir, reward):
     cfg.rewards = reward_map[reward]()
 
     env = gymnasium.make(env_name, cfg=cfg, agx_args=[])
-    env = ConvertObservations(env)
+    env = VisionObservationWrapper(env) if enable_vision else ConvertObservations(env)
+    # Since agx prohibits us from running two siimulations on the same thread we reuse the training env for eval
     eval_env = None
 
     demos = load_demo_pickles(demo_dir)
