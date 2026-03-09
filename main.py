@@ -47,6 +47,8 @@ flags.DEFINE_float('dataset_proportion', 1.0, "Proportion of the dataset to use"
 flags.DEFINE_integer('dataset_replace_interval', 1000, 'Dataset replace interval, used for large datasets because of memory constraints')
 flags.DEFINE_string('ogbench_dataset_dir', None, 'OGBench dataset directory')
 flags.DEFINE_string("agx_dataset_dir", None, "Directory with agx demonstration")
+flags.DEFINE_integer("agx_max_demos", None, "Maximum amount of demonstrations to include during offline pretraining")
+flags.DEFINE_integer("agx_demo_seed", None, "Seed for random shuffling the dataset")
 flags.DEFINE_integer("agx_reward", 5, "Reward type")
 
 flags.DEFINE_string('wandb_log_name', 'qc', 'Name under which the run is logged in w&b')
@@ -101,7 +103,9 @@ def main(_):
             FLAGS.env_name,
             FLAGS.agx_dataset_dir,
             FLAGS.agx_reward,
-            FLAGS.enable_vision
+            FLAGS.enable_vision,
+            FLAGS.agx_max_demos,
+            FLAGS.agx_demo_seed
         )
     else:
         env, eval_env, train_dataset, val_dataset = make_env_and_datasets(FLAGS.env_name)

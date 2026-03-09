@@ -1,5 +1,6 @@
 import os
 import pickle
+import random
 import numpy as np
 import gymnasium
 from rich.console import Console
@@ -27,7 +28,14 @@ def load_demo_pickles(demo_dir):
     return demos
 
 
-def demos_to_dataset(demos, reward_type, wrapper, enable_vision):
+def demos_to_dataset(demos, reward_type, wrapper, enable_vision, max_demos=None, seed=None):
+
+    rng = random.Random(seed)
+    rng.shuffle(demos)
+
+    if max_demos is not None:
+        demos = demos[:max_demos]
+
     obs, actions, rewards, terminals, next_obs = [], [], [], [], []
 
     total_steps = sum(len(t) for t in demos)
@@ -86,7 +94,7 @@ def demo_frame_to_obs(frame, enable_vision=False):
         "stone": frame["stone_pos"],
     }
 
-def make_agx_env_and_dataset(env_name, demo_dir, reward, enable_vision=False):
+def make_agx_env_and_dataset(env_name, demo_dir, reward, enable_vision=False, max_demos=None, seed=None):
     cfg = parse_env_cfg(
         env_name,
         device="cpu",
@@ -113,7 +121,7 @@ def make_agx_env_and_dataset(env_name, demo_dir, reward, enable_vision=False):
     eval_env = None
 
     demos = load_demo_pickles(demo_dir)
-    train_dataset = demos_to_dataset(demos, reward_type=reward, wrapper=env, enable_vision=enable_vision)
+    train_dataset = demos_to_dataset(demos, reward, env, enable_vision, max_demos, seed)
 
     return env, env, train_dataset, None
 
