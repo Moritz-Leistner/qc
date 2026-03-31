@@ -4,6 +4,7 @@ import jax
 import numpy as np
 from tqdm import trange
 from functools import partial
+from envs.agx_utils import convert_obs
 
 
 def supply_rng(f, rng=jax.random.PRNGKey(0)):
@@ -64,27 +65,60 @@ def evaluate(
     trajs = []
     stats = defaultdict(list)
 
+    # fixed termination keys (same as original eval)
+    termination_keys = {
+        "max_steps": 0,
+        "too_deep_termination": 0,
+        "stone_x_distance_termination": 0,
+        "stone_height_termination": 0,
+        "cabin_pitch_termination": 0,
+    }
+
+    # fixed reward keys (same as original eval)
+    reward_keys = {
+        "rock_stable": [],
+        "rock_z_pos": [],
+        "rock_1_5": [],
+        "rock_bucket_dis": [],
+        "rock_z_pos_clipped": [],
+        "energy_reg": [],
+    }
+
+    returns = []
+    successes = []
+    rock_lifted = []
+    fall_downs = []
+    end_positions = []
+    episode_lengths = []
+
     renders = []
     for i in trange(num_eval_episodes + num_video_episodes):
         traj = defaultdict(list)
         should_render = i >= num_eval_episodes
 
         observation, info = env.reset()
-            
+        
         observation_history = []
         action_history = []
-        
+
         done = False
         step = 0
         render = []
         action_chunk_lens = defaultdict(lambda: 0)
-
+        
         action_queue = []
+
+        # Custon Logging
+        ep_return = 0.0
+        episode_success = False
+        episode_rock_lifted = False
+        episode_fall_down = False
+        end_position = 0.0
+
 
         gripper_contact_lengths = []
         gripper_contact_length = 0
         while not done:
-            
             action = actor_fn(observations=observation)
 
             if len(action_queue) == 0:
@@ -100,7 +134,42 @@ def evaluate(
             if eval_gaussian is not None:
                 action = np.random.normal(action, eval_gaussian)
 
-            next_observation, reward, terminated, truncated, info = env.step(np.clip(action, -1, 1))
+            next_observation, reward, terminated, truncated, info = env.step([action[0]*2,action[1]*2,action[2]*2,0,0])
+
+            # Custom Logging
+            stone_pos = next_observation[-3:]
+            z = stone_pos[2]
+            end_position = z
+
+            if z >= 1.5:
+                episode_rock_lifted = True
+
+            if episode_rock_lifted and z <= 1.0:
+                episode_fall_down = True
+
+            rock_stable = info.get('extras', None)["Step_Reward/rock_stable"]
+            if rock_stable > 0:
+                episode_success = True
+
+            # reward logging
+            log_info = info.get("extras", {}).get("log", {})
+            step_rewards = info.get("extras", {})
+
+            for key in reward_keys.keys():
+                step_key = f"Step_Reward/{key}"
+                if step_key in step_rewards:
+                    reward_keys[key].append(step_rewards[step_key])
+
+            # termination logging
+            if done:
+                for key in termination_keys.keys():
+                    term_key = f"Episode_Termination/{key}"
+                    if log_info.get(term_key, 0) == 1:
+                        termination_keys[key] += 1
+
+            ep_return += reward
+            # End Custom Logging
+
             done = terminated or truncated
             step += 1
 
@@ -136,6 +205,15 @@ def evaluate(
                         gripper_contact_lengths.append(gripper_contact_length)
                     gripper_contact_length = 0
 
+
+        returns.append(ep_return)        
+        successes.append(episode_success)
+        rock_lifted.append(episode_rock_lifted)
+        fall_downs.append(episode_fall_down)
+        end_positions.append(end_position)
+        episode_lengths.append(step)
+
+
         if gripper_contact_length > 0:
             gripper_contact_lengths.append(gripper_contact_length)
         
@@ -154,8 +232,29 @@ def evaluate(
         else:
             renders.append(np.array(render))
 
+
+
     for k, v in stats.items():
-        stats[k] = np.mean(v)
+        arr = np.array(v)
+        if np.issubdtype(arr.dtype, np.number):
+            stats[k] = np.mean(arr)
+        else:
+            stats[k] = v
+    
+    # Custom Logging
+    mean_return = np.mean(returns)
+    success_ratio = np.mean(successes)
+    over_boundary_ratio = np.mean(rock_lifted)
+    fall_down_ratio = np.mean(fall_downs)
+    ends = np.mean(end_positions)
+    episode_length = np.mean(episode_lengths)
+
+    stats["episode_reward"] = mean_return
+    stats["episode_length"] = episode_length
+    stats["success_ratio"] = success_ratio
+    stats["rock_lifted_ratio"] = over_boundary_ratio
+    stats["fall_down_ratio"] = fall_down_ratio
+    stats["mean_end_position"] = ends
 
     return stats, trajs, renders
 

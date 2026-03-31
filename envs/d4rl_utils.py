@@ -3,7 +3,7 @@ import gymnasium
 import numpy as np
 
 from envs.env_utils import EpisodeMonitor
-from utils.datasets import Dataset
+from qc_utils.datasets import Dataset
 
 
 def make_env(env_name):
